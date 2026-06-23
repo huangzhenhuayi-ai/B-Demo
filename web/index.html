@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>B站关键词热度排查</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Bilibili Keyword Probe</p>
+          <h1>B站关键词热度排查</h1>
+        </div>
+        <div class="run-state" id="runState">
+          <span class="state-dot idle"></span>
+          <span id="stateText">待运行</span>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <form class="control-panel" id="runForm">
+          <label class="field field-keywords">
+            <span>关键词</span>
+            <textarea id="keywords" rows="7">AI副业
+普通人副业
+AI工具赚钱</textarea>
+          </label>
+
+          <div class="field-grid">
+            <label class="field">
+              <span>页数</span>
+              <input id="pages" type="number" min="1" max="5" value="1" />
+            </label>
+            <label class="field">
+              <span>最多条数</span>
+              <input id="maxResults" type="number" min="1" max="200" value="10" />
+            </label>
+            <label class="field">
+              <span>请求间隔</span>
+              <input id="sleep" type="number" min="0.1" max="10" step="0.1" value="1.2" />
+            </label>
+            <label class="field">
+              <span>超时秒数</span>
+              <input id="timeout" type="number" min="3" max="60" value="15" />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>排序</span>
+            <select id="order">
+              <option value="totalrank">综合排序</option>
+              <option value="click">最多播放</option>
+              <option value="pubdate">最新发布</option>
+              <option value="dm">最多弹幕</option>
+              <option value="stow">最多收藏</option>
+            </select>
+          </label>
+
+          <div class="toggle-row">
+            <label class="switch">
+              <input id="enrich" type="checkbox" checked />
+              <span class="slider"></span>
+              <span class="switch-label">补全点赞、投币、收藏</span>
+            </label>
+          </div>
+
+          <button class="primary-button" type="submit" id="runButton">
+            <span class="button-icon">▶</span>
+            <span>开始排查</span>
+          </button>
+        </form>
+
+        <section class="result-panel">
+          <div class="metrics-row">
+            <div class="metric">
+              <span>关键词</span>
+              <strong id="keywordCount">0</strong>
+            </div>
+            <div class="metric">
+              <span>已完成</span>
+              <strong id="doneCount">0</strong>
+            </div>
+            <div class="metric">
+              <span>当前</span>
+              <strong id="currentKeyword">-</strong>
+            </div>
+          </div>
+
+          <div class="progress-track">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+
+          <div class="actions-row">
+            <a class="download disabled" id="downloadSummary" href="#">下载汇总</a>
+            <a class="download disabled" id="downloadDetail" href="#">下载明细</a>
+          </div>
+
+          <div class="table-zone">
+            <div class="table-head">
+              <h2>关键词建议</h2>
+              <span id="summaryCount">0 条</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>关键词</th>
+                    <th>机会分</th>
+                    <th>需求</th>
+                    <th>增长</th>
+                    <th>竞争</th>
+                    <th>建议</th>
+                    <th>原因</th>
+                  </tr>
+                </thead>
+                <tbody id="summaryBody">
+                  <tr>
+                    <td colspan="7" class="empty">暂无结果</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="table-zone">
+            <div class="table-head">
+              <h2>视频明细预览</h2>
+              <span id="detailCount">0 条</span>
+            </div>
+            <div class="table-wrap detail-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>排名</th>
+                    <th>标题</th>
+                    <th>UP主</th>
+                    <th>播放</th>
+                    <th>点赞</th>
+                    <th>收藏</th>
+                    <th>发布时间</th>
+                  </tr>
+                </thead>
+                <tbody id="detailBody">
+                  <tr>
+                    <td colspan="7" class="empty">暂无结果</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
