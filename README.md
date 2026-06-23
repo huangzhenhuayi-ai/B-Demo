@@ -1,9 +1,10 @@
 # B站选题关键词热度排查工具
 
-这是一个本地运行的 MVP 工具：输入一个或多个关键词，自动采集 B站公开视频搜索结果，并输出两份 CSV：
+这是一个本地运行的 MVP 工具：输入一个或多个关键词，自动采集 B站公开视频搜索结果，并输出三份 CSV：
 
 - `bilibili_videos_*.csv`：逐条视频明细
 - `bilibili_keyword_summary_*.csv`：每个关键词的热度评分和执行建议
+- `bilibili_keyword_suggestions_*.csv`：每个关键词在 B站搜索框里的联想词
 
 可视化界面由 `bilibili_keyword_app.py` 启动，页面文件在 `web/` 目录；命令行采集脚本是 `bilibili_keyword_probe.py`。
 
@@ -46,6 +47,15 @@
 | opportunity_score | 机会分，综合需求、增长、结果深度和竞争 |
 | recommendation | `可执行`、`小样本测试` 或 `暂不建议` |
 | reason | 简短原因 |
+
+联想词表会输出：
+
+| 字段 | 含义 |
+|---|---|
+| keyword | 原始搜索关键词 |
+| suggestion_rank | 联想词排名 |
+| suggestion | B站搜索框联想词 |
+| source | 数据来源，当前为 `search_box` |
 
 ## 快速开始
 
@@ -96,6 +106,7 @@ python .\bilibili_keyword_probe.py --keywords-file .\keywords.example.txt --page
 --keywords-file / -f    关键词文件，每行一个关键词
 --pages / -p            每个关键词采集页数，默认 1
 --max-results           每个关键词最多保留多少条结果，适合小样本测试
+--suggestions-limit     每个关键词采集多少条搜索框联想词，默认 10
 --order                 搜索排序，默认 totalrank
 --output-dir / -o       输出目录，默认 outputs
 --sleep                 请求间隔秒数，默认 0.8

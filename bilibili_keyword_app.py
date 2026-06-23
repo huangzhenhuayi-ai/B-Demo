@@ -21,7 +21,9 @@ from typing import Any, Dict, List, Optional
 from bilibili_keyword_probe import (
     DETAIL_FIELDS,
     SUMMARY_FIELDS,
+    SUGGESTION_FIELDS,
     FetchConfig,
+    collect_suggestions,
     collect_for_keyword,
     summarize_keyword,
     write_csv,
@@ -65,6 +67,7 @@ def public_job(job: Dict[str, Any]) -> Dict[str, Any]:
         "completed_keywords",
         "total_keywords",
         "summary",
+        "suggestions",
         "details_preview",
         "files",
         "error",
@@ -84,6 +87,7 @@ def run_job(job_id: str, options: Dict[str, Any]) -> None:
     max_results = options.get("max_results")
     order = options["order"]
     enrich = options["enrich"]
+    suggestions_limit = options["suggestions_limit"]
     config = FetchConfig(
         timeout=options["timeout"],
         retries=options["retries"],
@@ -95,9 +99,11 @@ def run_job(job_id: str, options: Dict[str, Any]) -> None:
     run_dir = OUTPUT_DIR / f"web_run_{timestamp}_{job_id[:8]}"
     detail_path = run_dir / "bilibili_videos.csv"
     summary_path = run_dir / "bilibili_keyword_summary.csv"
+    suggestions_path = run_dir / "bilibili_keyword_suggestions.csv"
 
     all_rows: List[Dict[str, Any]] = []
     summary_rows: List[Dict[str, Any]] = []
+    suggestion_rows: List[Dict[str, Any]] = []
 
     update_job(
         job_id,
@@ -113,9 +119,29 @@ def run_job(job_id: str, options: Dict[str, Any]) -> None:
             update_job(
                 job_id,
                 current_keyword=keyword,
-                message=f"正在采集：{keyword}",
+                message=f"正在采集联想词：{keyword}",
                 completed_keywords=index - 1,
             )
+            try:
+                suggestions = collect_suggestions(keyword, config, limit=suggestions_limit)
+            except Exception as exc:  # pragma: no cover - network dependent
+                suggestions = [
+                    {
+                        "platform": "bilibili",
+                        "keyword": keyword,
+                        "suggestion_rank": 0,
+                        "suggestion": "",
+                        "highlighted": f"采集失败：{exc}",
+                        "source": "search_box",
+                    }
+                ]
+            suggestion_rows.extend(suggestions)
+            update_job(
+                job_id,
+                suggestions=suggestion_rows,
+                message=f"正在采集视频：{keyword}",
+            )
+
             try:
                 rows = collect_for_keyword(
                     keyword,
@@ -136,11 +162,13 @@ def run_job(job_id: str, options: Dict[str, Any]) -> None:
                 job_id,
                 completed_keywords=index,
                 summary=summary_rows,
+                suggestions=suggestion_rows,
                 details_preview=all_rows[:100],
             )
 
         write_csv(str(detail_path), all_rows, DETAIL_FIELDS)
         write_csv(str(summary_path), summary_rows, SUMMARY_FIELDS)
+        write_csv(str(suggestions_path), suggestion_rows, SUGGESTION_FIELDS)
         update_job(
             job_id,
             status="done",
@@ -148,12 +176,15 @@ def run_job(job_id: str, options: Dict[str, Any]) -> None:
             finished_at=dt.datetime.now().isoformat(timespec="seconds"),
             current_keyword="",
             summary=summary_rows,
+            suggestions=suggestion_rows,
             details_preview=all_rows[:100],
             files={
                 "detail": f"/api/download/{job_id}/detail",
                 "summary": f"/api/download/{job_id}/summary",
+                "suggestions": f"/api/download/{job_id}/suggestions",
                 "detail_path": str(detail_path),
                 "summary_path": str(summary_path),
+                "suggestions_path": str(suggestions_path),
             },
         )
     except Exception as exc:  # pragma: no cover - defensive guard
@@ -214,6 +245,7 @@ class AppHandler(SimpleHTTPRequestHandler):
                 "sleep": clamp_float(payload.get("sleep"), 0.1, 10.0, default=1.0),
                 "timeout": clamp_float(payload.get("timeout"), 3.0, 60.0, default=15.0),
                 "retries": clamp_int(payload.get("retries"), 1, 5, default=2),
+                "suggestions_limit": clamp_int(payload.get("suggestions_limit"), 0, 20, default=10),
                 "enrich": bool(payload.get("enrich", True)),
                 "force_ipv4": bool(payload.get("force_ipv4", True)),
             }
@@ -227,6 +259,7 @@ class AppHandler(SimpleHTTPRequestHandler):
                 "completed_keywords": 0,
                 "total_keywords": len(keywords),
                 "summary": [],
+                "suggestions": [],
                 "details_preview": [],
             }
             with JOBS_LOCK:
@@ -261,7 +294,12 @@ class AppHandler(SimpleHTTPRequestHandler):
             self.send_json({"error": "文件还未生成"}, HTTPStatus.NOT_FOUND)
             return
         files = job.get("files") or {}
-        path_key = "summary_path" if kind == "summary" else "detail_path"
+        if kind == "summary":
+            path_key = "summary_path"
+        elif kind == "suggestions":
+            path_key = "suggestions_path"
+        else:
+            path_key = "detail_path"
         path = Path(files.get(path_key, ""))
         if not path.exists() or not path.is_file():
             self.send_json({"error": "文件不存在"}, HTTPStatus.NOT_FOUND)

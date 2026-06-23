@@ -435,6 +435,18 @@ tbody tr:last-child td {
   background: #f5dfdf;
 }
 
+.suggestion-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #234b73;
+  background: #e4eef8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .video-title {
   display: inline-block;
   max-width: 520px;

@@ -33,6 +33,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 SEARCH_URL = "https://api.bilibili.com/x/web-interface/search/type"
 VIEW_URL = "https://api.bilibili.com/x/web-interface/view"
+SUGGEST_URL = "https://s.search.bilibili.com/main/suggest"
 
 
 DETAIL_FIELDS = [
@@ -83,6 +84,16 @@ SUMMARY_FIELDS = [
     "opportunity_score",
     "recommendation",
     "reason",
+]
+
+
+SUGGESTION_FIELDS = [
+    "platform",
+    "keyword",
+    "suggestion_rank",
+    "suggestion",
+    "highlighted",
+    "source",
 ]
 
 
@@ -318,6 +329,36 @@ def request_json(
                 time.sleep(min(8, attempt * 1.5))
 
     raise RuntimeError(f"Request failed: {full_url}\n{last_error}")
+
+
+def collect_suggestions(keyword: str, config: FetchConfig, limit: int = 10) -> List[Dict[str, Any]]:
+    if limit <= 0:
+        return []
+
+    params = {"term": keyword}
+    data = request_json(SUGGEST_URL, params, config, referer_keyword=keyword)
+    tags = data.get("result", {}).get("tag") or []
+
+    rows: List[Dict[str, Any]] = []
+    seen = set()
+    for item in tags:
+        suggestion = clean_text(item.get("value") or item.get("term") or item.get("name"))
+        if not suggestion or suggestion in seen:
+            continue
+        seen.add(suggestion)
+        rows.append(
+            {
+                "platform": "bilibili",
+                "keyword": keyword,
+                "suggestion_rank": len(rows) + 1,
+                "suggestion": suggestion,
+                "highlighted": clean_text(item.get("name")),
+                "source": "search_box",
+            }
+        )
+        if len(rows) >= limit:
+            break
+    return rows
 
 
 def search_videos(keyword: str, pages: int, config: FetchConfig, order: str) -> List[Dict[str, Any]]:
@@ -607,6 +648,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("-f", "--keywords-file", help="关键词文件，每行一个关键词。")
     parser.add_argument("-p", "--pages", type=int, default=1, help="每个关键词采集搜索页数，默认 1。")
     parser.add_argument("--max-results", type=int, help="每个关键词最多保留多少条结果，适合小样本测试。")
+    parser.add_argument("--suggestions-limit", type=int, default=10, help="每个关键词采集多少条搜索框联想词，默认 10。")
     parser.add_argument(
         "--order",
         default="totalrank",
@@ -643,9 +685,18 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
 
     all_rows: List[Dict[str, Any]] = []
     summary_rows: List[Dict[str, Any]] = []
+    suggestion_rows: List[Dict[str, Any]] = []
     failed_keywords: List[str] = []
 
     for keyword in keywords:
+        try:
+            suggestions = collect_suggestions(keyword, config, limit=max(0, args.suggestions_limit))
+            suggestion_rows.extend(suggestions)
+            if suggestions:
+                print(f"  联想词：{', '.join(row['suggestion'] for row in suggestions)}")
+        except RuntimeError as exc:
+            print(f"  警告：采集 {keyword} 联想词失败：{exc}", file=sys.stderr)
+
         try:
             rows = collect_for_keyword(
                 keyword,
@@ -665,13 +716,16 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
 
     detail_path = os.path.join(args.output_dir, f"bilibili_videos_{timestamp}.csv")
     summary_path = os.path.join(args.output_dir, f"bilibili_keyword_summary_{timestamp}.csv")
+    suggestions_path = os.path.join(args.output_dir, f"bilibili_keyword_suggestions_{timestamp}.csv")
     write_csv(detail_path, all_rows, DETAIL_FIELDS)
     write_csv(summary_path, summary_rows, SUMMARY_FIELDS)
+    write_csv(suggestions_path, suggestion_rows, SUGGESTION_FIELDS)
 
     print("")
     print("完成。")
     print(f"明细表：{detail_path}")
     print(f"汇总表：{summary_path}")
+    print(f"联想词表：{suggestions_path}")
     if failed_keywords:
         print(f"失败关键词：{', '.join(failed_keywords)}")
     return 1 if failed_keywords and not all_rows else 0

@@ -45,6 +45,10 @@ AI工具赚钱</textarea>
               <span>超时秒数</span>
               <input id="timeout" type="number" min="3" max="60" value="15" />
             </label>
+            <label class="field">
+              <span>联想词数</span>
+              <input id="suggestionsLimit" type="number" min="0" max="20" value="10" />
+            </label>
           </div>
 
           <label class="field">
@@ -102,6 +106,7 @@ AI工具赚钱</textarea>
 
           <div class="actions-row">
             <a class="download disabled" id="downloadSummary" href="#">下载汇总</a>
+            <a class="download disabled" id="downloadSuggestions" href="#">下载联想词</a>
             <a class="download disabled" id="downloadDetail" href="#">下载明细</a>
           </div>
 
@@ -126,6 +131,29 @@ AI工具赚钱</textarea>
                 <tbody id="summaryBody">
                   <tr>
                     <td colspan="7" class="empty">暂无结果</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="table-zone">
+            <div class="table-head">
+              <h2>搜索框联想词</h2>
+              <span id="suggestionCount">0 条</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>关键词</th>
+                    <th>排名</th>
+                    <th>联想词</th>
+                  </tr>
+                </thead>
+                <tbody id="suggestionBody">
+                  <tr>
+                    <td colspan="3" class="empty">暂无结果</td>
                   </tr>
                 </tbody>
               </table>

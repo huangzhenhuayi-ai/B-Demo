@@ -7,10 +7,13 @@ const doneCount = document.getElementById("doneCount");
 const currentKeyword = document.getElementById("currentKeyword");
 const progressBar = document.getElementById("progressBar");
 const summaryBody = document.getElementById("summaryBody");
+const suggestionBody = document.getElementById("suggestionBody");
 const detailBody = document.getElementById("detailBody");
 const summaryCount = document.getElementById("summaryCount");
+const suggestionCount = document.getElementById("suggestionCount");
 const detailCount = document.getElementById("detailCount");
 const downloadSummary = document.getElementById("downloadSummary");
+const downloadSuggestions = document.getElementById("downloadSuggestions");
 const downloadDetail = document.getElementById("downloadDetail");
 
 const numberFormat = new Intl.NumberFormat("zh-CN");
@@ -29,6 +32,7 @@ form.addEventListener("submit", async (event) => {
     max_results: Number(document.getElementById("maxResults").value),
     sleep: Number(document.getElementById("sleep").value),
     timeout: Number(document.getElementById("timeout").value),
+    suggestions_limit: Number(document.getElementById("suggestionsLimit").value),
     order: document.getElementById("order").value,
     enrich: document.getElementById("enrich").checked,
     force_ipv4: document.getElementById("forceIpv4").checked,
@@ -93,6 +97,7 @@ function renderJob(job) {
   const label = job.message || statusLabel(job.status);
   setState(job.status, label);
   renderSummary(job.summary || []);
+  renderSuggestions(job.suggestions || []);
   renderDetails(job.details_preview || []);
   if (job.files) {
     setDownloads(job.files);
@@ -121,14 +126,18 @@ function statusLabel(status) {
 function setDownloads(files) {
   if (!files) {
     downloadSummary.classList.add("disabled");
+    downloadSuggestions.classList.add("disabled");
     downloadDetail.classList.add("disabled");
     downloadSummary.removeAttribute("href");
+    downloadSuggestions.removeAttribute("href");
     downloadDetail.removeAttribute("href");
     return;
   }
   downloadSummary.href = files.summary;
+  downloadSuggestions.href = files.suggestions;
   downloadDetail.href = files.detail;
   downloadSummary.classList.remove("disabled");
+  downloadSuggestions.classList.remove("disabled");
   downloadDetail.classList.remove("disabled");
 }
 
@@ -155,6 +164,25 @@ function renderSummary(rows) {
   }
 }
 
+function renderSuggestions(rows) {
+  suggestionCount.textContent = `${rows.length} 条`;
+  suggestionBody.replaceChildren();
+  if (!rows.length) {
+    suggestionBody.appendChild(emptyRow(3));
+    return;
+  }
+
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    tr.append(
+      cell(row.keyword),
+      cell(row.suggestion_rank || "-"),
+      suggestionCell(row.suggestion || row.highlighted || "-")
+    );
+    suggestionBody.appendChild(tr);
+  }
+}
+
 function renderDetails(rows) {
   detailCount.textContent = `${rows.length} 条`;
   detailBody.replaceChildren();
@@ -176,6 +204,15 @@ function renderDetails(rows) {
     );
     detailBody.appendChild(tr);
   }
+}
+
+function suggestionCell(value) {
+  const td = document.createElement("td");
+  const chip = document.createElement("span");
+  chip.className = "suggestion-chip";
+  chip.textContent = value || "-";
+  td.appendChild(chip);
+  return td;
 }
 
 function cell(value) {
