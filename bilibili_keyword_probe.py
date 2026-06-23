@@ -168,7 +168,11 @@ def request_json_with_curl(full_url: str, headers: Dict[str, str], config: Fetch
         raise RuntimeError(f"curl failed with exit code {completed.returncode}: {stderr}")
 
     raw = completed.stdout.decode("utf-8", errors="replace")
-    data = json.loads(raw)
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        preview = clean_text(raw)[:300]
+        raise RuntimeError(f"curl returned non-JSON response: {preview}") from exc
     if data.get("code") not in (0, None):
         message = data.get("message") or data.get("msg") or "unknown API error"
         raise RuntimeError(f"Bilibili API error {data.get('code')}: {message}")
@@ -307,11 +311,12 @@ def request_json(
         if config.prefer_curl:
             try:
                 return request_json_with_curl(full_url, headers, config)
-            except (subprocess.TimeoutExpired, json.JSONDecodeError, RuntimeError) as exc:
+            except (subprocess.TimeoutExpired, RuntimeError) as exc:
                 last_error = exc
                 if attempt < config.retries:
                     time.sleep(min(8, attempt * 1.5))
                     continue
+                raise RuntimeError(f"Request failed via curl: {full_url}\n{last_error}") from exc
 
         request = urllib.request.Request(full_url, headers=headers)
         try:
