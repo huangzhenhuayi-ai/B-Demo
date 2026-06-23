@@ -18,6 +18,9 @@ import math
 import os
 import random
 import re
+import shutil
+import socket
+import subprocess
 import sys
 import time
 import urllib.error
@@ -89,6 +92,76 @@ class FetchConfig:
     retries: int = 3
     sleep_seconds: float = 0.8
     jitter_seconds: float = 0.4
+    force_ipv4: bool = True
+    prefer_curl: bool = True
+
+
+_ORIGINAL_GETADDRINFO = socket.getaddrinfo
+_IPV4_ONLY_ENABLED = False
+
+
+def enable_ipv4_only() -> None:
+    global _IPV4_ONLY_ENABLED
+    if _IPV4_ONLY_ENABLED:
+        return
+
+    def ipv4_getaddrinfo(host: str, port: Any, family: int = 0, type: int = 0, proto: int = 0, flags: int = 0):
+        results = _ORIGINAL_GETADDRINFO(host, port, socket.AF_INET, type, proto, flags)
+        return [item for item in results if item[0] == socket.AF_INET]
+
+    socket.getaddrinfo = ipv4_getaddrinfo
+    _IPV4_ONLY_ENABLED = True
+
+
+def find_curl() -> Optional[str]:
+    system_root = os.environ.get("SystemRoot", r"C:\Windows")
+    candidates = [
+        os.path.join(system_root, "System32", "curl.exe"),
+        os.path.join(system_root, "Sysnative", "curl.exe"),
+        shutil.which("curl.exe"),
+        shutil.which("curl"),
+    ]
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+    return None
+
+
+def request_json_with_curl(full_url: str, headers: Dict[str, str], config: FetchConfig) -> Dict[str, Any]:
+    curl = find_curl()
+    if not curl:
+        raise RuntimeError("curl is not available")
+
+    command = [
+        curl,
+        "--silent",
+        "--show-error",
+        "--location",
+        "--max-time",
+        str(max(3, int(config.timeout))),
+    ]
+    if config.force_ipv4:
+        command.append("--ipv4")
+    for key, value in headers.items():
+        command.extend(["--header", f"{key}: {value}"])
+    command.append(full_url)
+
+    completed = subprocess.run(
+        command,
+        capture_output=True,
+        timeout=config.timeout + 8,
+        check=False,
+    )
+    if completed.returncode != 0:
+        stderr = completed.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"curl failed with exit code {completed.returncode}: {stderr}")
+
+    raw = completed.stdout.decode("utf-8", errors="replace")
+    data = json.loads(raw)
+    if data.get("code") not in (0, None):
+        message = data.get("message") or data.get("msg") or "unknown API error"
+        raise RuntimeError(f"Bilibili API error {data.get('code')}: {message}")
+    return data
 
 
 def clean_text(value: Any) -> str:
@@ -197,6 +270,9 @@ def request_json(
     config: FetchConfig,
     referer_keyword: Optional[str] = None,
 ) -> Dict[str, Any]:
+    if config.force_ipv4:
+        enable_ipv4_only()
+
     query = urllib.parse.urlencode(params)
     full_url = f"{url}?{query}"
     referer = "https://www.bilibili.com/"
@@ -217,6 +293,15 @@ def request_json(
 
     last_error: Optional[Exception] = None
     for attempt in range(1, config.retries + 1):
+        if config.prefer_curl:
+            try:
+                return request_json_with_curl(full_url, headers, config)
+            except (subprocess.TimeoutExpired, json.JSONDecodeError, RuntimeError) as exc:
+                last_error = exc
+                if attempt < config.retries:
+                    time.sleep(min(8, attempt * 1.5))
+                    continue
+
         request = urllib.request.Request(full_url, headers=headers)
         try:
             with urllib.request.urlopen(request, timeout=config.timeout) as response:
@@ -532,6 +617,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sleep", type=float, default=0.8, help="请求间隔秒数，默认 0.8。")
     parser.add_argument("--timeout", type=float, default=12.0, help="单次请求超时秒数，默认 12。")
     parser.add_argument("--retries", type=int, default=3, help="失败重试次数，默认 3。")
+    parser.add_argument("--allow-ipv6", action="store_true", help="允许 IPv6。默认强制 IPv4，以避免部分网络下 B站 TLS 握手超时。")
+    parser.add_argument("--no-curl", action="store_true", help="不使用 curl 作为请求传输层，改用 Python urllib。")
     parser.add_argument("--no-enrich", action="store_true", help="只保存搜索页数据，不逐条补全视频统计。")
     return parser
 
@@ -545,7 +632,13 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         parser.error("请通过 --keyword 或 --keywords-file 提供至少一个关键词。")
 
     pages = max(1, args.pages)
-    config = FetchConfig(timeout=args.timeout, retries=max(1, args.retries), sleep_seconds=max(0, args.sleep))
+    config = FetchConfig(
+        timeout=args.timeout,
+        retries=max(1, args.retries),
+        sleep_seconds=max(0, args.sleep),
+        force_ipv4=not args.allow_ipv6,
+        prefer_curl=not args.no_curl,
+    )
     timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     all_rows: List[Dict[str, Any]] = []

@@ -88,6 +88,7 @@ def run_job(job_id: str, options: Dict[str, Any]) -> None:
         timeout=options["timeout"],
         retries=options["retries"],
         sleep_seconds=options["sleep"],
+        force_ipv4=options["force_ipv4"],
     )
 
     timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -214,6 +215,7 @@ class AppHandler(SimpleHTTPRequestHandler):
                 "timeout": clamp_float(payload.get("timeout"), 3.0, 60.0, default=15.0),
                 "retries": clamp_int(payload.get("retries"), 1, 5, default=2),
                 "enrich": bool(payload.get("enrich", True)),
+                "force_ipv4": bool(payload.get("force_ipv4", True)),
             }
             job_id = uuid.uuid4().hex
             job = {

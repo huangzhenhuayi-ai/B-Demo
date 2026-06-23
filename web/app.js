@@ -31,6 +31,7 @@ form.addEventListener("submit", async (event) => {
     timeout: Number(document.getElementById("timeout").value),
     order: document.getElementById("order").value,
     enrich: document.getElementById("enrich").checked,
+    force_ipv4: document.getElementById("forceIpv4").checked,
   };
 
   try {

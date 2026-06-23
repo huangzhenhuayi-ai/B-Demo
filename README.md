@@ -9,6 +9,8 @@
 
 工具只读取公开可访问的视频搜索和视频统计数据，不处理登录、验证码或绕风控场景。建议小批量、低频率使用。
 
+当前版本默认使用系统 `curl` 通过 IPv4 请求 B站接口。这样可以避开部分 Windows 网络环境下 Python 直接访问 B站时出现的 IPv6 / TLS 握手超时问题。
+
 ## 采集的数据
 
 明细表会尽量记录这些字段：
@@ -97,6 +99,8 @@ python .\bilibili_keyword_probe.py --keywords-file .\keywords.example.txt --page
 --order                 搜索排序，默认 totalrank
 --output-dir / -o       输出目录，默认 outputs
 --sleep                 请求间隔秒数，默认 0.8
+--allow-ipv6            允许 IPv6。默认强制 IPv4
+--no-curl               不使用 curl，改用 Python urllib
 --no-enrich             只采集搜索页数据，不逐条补全点赞/投币/分享等统计
 ```
 
