@@ -28,6 +28,12 @@ from bilibili_keyword_probe import (
     summarize_keyword,
     write_csv,
 )
+from bilibili_topic_analyzer import (
+    OPTIMIZED_TOPIC_FIELDS,
+    TOPIC_KEYWORD_FIELDS,
+    TOPIC_SUMMARY_FIELDS,
+    analyze_topic,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -71,6 +77,11 @@ def public_job(job: Dict[str, Any]) -> Dict[str, Any]:
         "details_preview",
         "files",
         "error",
+        "mode",
+        "topic",
+        "topic_summary",
+        "topic_keywords",
+        "optimized_topics",
     }
     return {key: job.get(key) for key in allowed if key in job}
 
@@ -197,6 +208,107 @@ def run_job(job_id: str, options: Dict[str, Any]) -> None:
         )
 
 
+def run_topic_job(job_id: str, options: Dict[str, Any]) -> None:
+    topic = options["topic"]
+    config = FetchConfig(
+        timeout=options["timeout"],
+        retries=options["retries"],
+        sleep_seconds=options["sleep"],
+        force_ipv4=options["force_ipv4"],
+    )
+
+    timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = OUTPUT_DIR / f"topic_run_{timestamp}_{job_id[:8]}"
+    detail_path = run_dir / "bilibili_topic_videos.csv"
+    keyword_summary_path = run_dir / "bilibili_topic_keyword_summary.csv"
+    suggestions_path = run_dir / "bilibili_topic_suggestions.csv"
+    topic_summary_path = run_dir / "bilibili_topic_summary.csv"
+    topic_keywords_path = run_dir / "bilibili_topic_keywords.csv"
+    optimized_topics_path = run_dir / "bilibili_optimized_topics.csv"
+
+    update_job(
+        job_id,
+        status="running",
+        started_at=dt.datetime.now().isoformat(timespec="seconds"),
+        message="开始分析选题",
+        completed_keywords=0,
+        total_keywords=1,
+        current_keyword=topic,
+    )
+
+    def progress(updates: Dict[str, Any]) -> None:
+        topic_result = updates.pop("topic_result", None)
+        if topic_result:
+            updates.update(
+                {
+                    "topic_summary": topic_result.get("topic_summary"),
+                    "topic_keywords": topic_result.get("topic_keywords", []),
+                    "optimized_topics": topic_result.get("optimized_topics", []),
+                    "summary": topic_result.get("summary", []),
+                    "suggestions": topic_result.get("suggestions", []),
+                    "details_preview": topic_result.get("details_preview", []),
+                }
+            )
+        update_job(job_id, **updates)
+
+    try:
+        result = analyze_topic(
+            topic=topic,
+            config=config,
+            pages=options["pages"],
+            order=options["order"],
+            enrich=options["enrich"],
+            max_results=options.get("max_results"),
+            suggestions_limit=options["suggestions_limit"],
+            keyword_limit=options["keyword_limit"],
+            optimized_limit=options["optimized_limit"],
+            progress_callback=progress,
+        )
+
+        write_csv(str(detail_path), result["details"], DETAIL_FIELDS)
+        write_csv(str(keyword_summary_path), result["summary"], SUMMARY_FIELDS)
+        write_csv(str(suggestions_path), result["suggestions"], SUGGESTION_FIELDS)
+        write_csv(str(topic_summary_path), [result["topic_summary"]], TOPIC_SUMMARY_FIELDS)
+        write_csv(str(topic_keywords_path), result["topic_keywords"], TOPIC_KEYWORD_FIELDS)
+        write_csv(str(optimized_topics_path), result["optimized_topics"], OPTIMIZED_TOPIC_FIELDS)
+
+        update_job(
+            job_id,
+            status="done",
+            message="选题分析完成",
+            finished_at=dt.datetime.now().isoformat(timespec="seconds"),
+            current_keyword="",
+            topic_summary=result["topic_summary"],
+            topic_keywords=result["topic_keywords"],
+            optimized_topics=result["optimized_topics"],
+            summary=result["summary"],
+            suggestions=result["suggestions"],
+            details_preview=result["details_preview"],
+            files={
+                "topic": f"/api/download/{job_id}/topic",
+                "topic_keywords": f"/api/download/{job_id}/topic-keywords",
+                "optimized": f"/api/download/{job_id}/optimized",
+                "detail": f"/api/download/{job_id}/detail",
+                "summary": f"/api/download/{job_id}/summary",
+                "suggestions": f"/api/download/{job_id}/suggestions",
+                "topic_summary_path": str(topic_summary_path),
+                "topic_keywords_path": str(topic_keywords_path),
+                "optimized_topics_path": str(optimized_topics_path),
+                "detail_path": str(detail_path),
+                "summary_path": str(keyword_summary_path),
+                "suggestions_path": str(suggestions_path),
+            },
+        )
+    except Exception as exc:  # pragma: no cover - defensive guard
+        update_job(
+            job_id,
+            status="error",
+            message="选题分析失败",
+            error=f"{exc}\n{traceback.format_exc()}",
+            finished_at=dt.datetime.now().isoformat(timespec="seconds"),
+        )
+
+
 def empty_summary(keyword: str, error: str) -> Dict[str, Any]:
     row = {field: 0 for field in SUMMARY_FIELDS}
     row.update(
@@ -225,6 +337,9 @@ class AppHandler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:
         if self.path == "/api/runs":
             self.handle_create_job()
+            return
+        if self.path == "/api/topic-runs":
+            self.handle_create_topic_job()
             return
         self.send_json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
 
@@ -271,6 +386,55 @@ class AppHandler(SimpleHTTPRequestHandler):
         except json.JSONDecodeError:
             self.send_json({"error": "请求体不是有效 JSON"}, HTTPStatus.BAD_REQUEST)
 
+    def handle_create_topic_job(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}
+            topic = str(payload.get("topic", "")).strip()
+            if not topic:
+                self.send_json({"error": "请先输入一个选题"}, HTTPStatus.BAD_REQUEST)
+                return
+
+            options = {
+                "topic": topic,
+                "pages": clamp_int(payload.get("pages"), 1, 5, default=1),
+                "max_results": optional_int(payload.get("max_results"), 1, 200),
+                "order": payload.get("order") if payload.get("order") in {"totalrank", "click", "pubdate", "dm", "stow"} else "totalrank",
+                "sleep": clamp_float(payload.get("sleep"), 0.1, 10.0, default=1.2),
+                "timeout": clamp_float(payload.get("timeout"), 3.0, 60.0, default=15.0),
+                "retries": clamp_int(payload.get("retries"), 1, 5, default=2),
+                "suggestions_limit": clamp_int(payload.get("suggestions_limit"), 0, 20, default=10),
+                "keyword_limit": clamp_int(payload.get("keyword_limit"), 2, 8, default=5),
+                "optimized_limit": clamp_int(payload.get("optimized_limit"), 3, 12, default=8),
+                "enrich": bool(payload.get("enrich", True)),
+                "force_ipv4": bool(payload.get("force_ipv4", True)),
+            }
+            job_id = uuid.uuid4().hex
+            job = {
+                "id": job_id,
+                "mode": "topic",
+                "status": "queued",
+                "message": "等待开始",
+                "topic": topic,
+                "created_at": dt.datetime.now().isoformat(timespec="seconds"),
+                "completed_keywords": 0,
+                "total_keywords": 1,
+                "topic_summary": None,
+                "topic_keywords": [],
+                "optimized_topics": [],
+                "summary": [],
+                "suggestions": [],
+                "details_preview": [],
+            }
+            with JOBS_LOCK:
+                JOBS[job_id] = job
+
+            thread = threading.Thread(target=run_topic_job, args=(job_id, options), daemon=True)
+            thread.start()
+            self.send_json(public_job(job), HTTPStatus.CREATED)
+        except json.JSONDecodeError:
+            self.send_json({"error": "请求体不是有效 JSON"}, HTTPStatus.BAD_REQUEST)
+
     def handle_job_status(self) -> None:
         job_id = self.path.rsplit("/", 1)[-1]
         with JOBS_LOCK:
@@ -294,12 +458,18 @@ class AppHandler(SimpleHTTPRequestHandler):
             self.send_json({"error": "文件还未生成"}, HTTPStatus.NOT_FOUND)
             return
         files = job.get("files") or {}
-        if kind == "summary":
-            path_key = "summary_path"
-        elif kind == "suggestions":
-            path_key = "suggestions_path"
-        else:
-            path_key = "detail_path"
+        path_keys = {
+            "summary": "summary_path",
+            "suggestions": "suggestions_path",
+            "detail": "detail_path",
+            "topic": "topic_summary_path",
+            "topic-keywords": "topic_keywords_path",
+            "optimized": "optimized_topics_path",
+        }
+        path_key = path_keys.get(kind)
+        if not path_key:
+            self.send_json({"error": "下载类型无效"}, HTTPStatus.BAD_REQUEST)
+            return
         path = Path(files.get(path_key, ""))
         if not path.exists() or not path.is_file():
             self.send_json({"error": "文件不存在"}, HTTPStatus.NOT_FOUND)

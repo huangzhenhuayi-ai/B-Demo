@@ -134,6 +134,39 @@ h2 {
   top: 18px;
 }
 
+.mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #eef2ee;
+}
+
+.mode-button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.mode-button.active {
+  color: #ffffff;
+  background: var(--accent);
+}
+
+.mode-panel {
+  display: grid;
+}
+
+.hidden {
+  display: none !important;
+}
+
 .result-panel {
   padding: 18px;
 }
@@ -327,6 +360,7 @@ select:focus {
 .actions-row {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 16px;
 }
@@ -352,6 +386,33 @@ select:focus {
 
 .table-zone + .table-zone {
   margin-top: 18px;
+}
+
+.topic-result {
+  margin-bottom: 18px;
+}
+
+.topic-score-grid {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.topic-score-card strong {
+  font-size: 34px;
+}
+
+.topic-score-card em {
+  font-style: normal;
+}
+
+.topic-reason-card strong {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  font-size: 15px;
+  line-height: 1.45;
 }
 
 .table-head {
@@ -435,6 +496,32 @@ tbody tr:last-child td {
   background: #f5dfdf;
 }
 
+.topic-tag {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.topic-tag.go {
+  color: #0f5f58;
+  background: #dcefeb;
+}
+
+.topic-tag.test {
+  color: #80450f;
+  background: #faead7;
+}
+
+.topic-tag.no {
+  color: #8c2f2f;
+  background: #f5dfdf;
+}
+
 .suggestion-chip {
   display: inline-flex;
   align-items: center;
@@ -475,6 +562,10 @@ tbody tr:last-child td {
 
   .metrics-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .topic-score-grid {
+    grid-template-columns: 1fr;
   }
 
   .metric:last-child {

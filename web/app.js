@@ -1,4 +1,8 @@
 const form = document.getElementById("runForm");
+const modeButtons = document.querySelectorAll(".mode-button");
+const topicPanel = document.getElementById("topicPanel");
+const keywordPanel = document.getElementById("keywordPanel");
+const topicOnlyFields = document.querySelectorAll(".topic-only");
 const runButton = document.getElementById("runButton");
 const runState = document.getElementById("runState");
 const stateText = document.getElementById("stateText");
@@ -15,9 +19,26 @@ const detailCount = document.getElementById("detailCount");
 const downloadSummary = document.getElementById("downloadSummary");
 const downloadSuggestions = document.getElementById("downloadSuggestions");
 const downloadDetail = document.getElementById("downloadDetail");
+const downloadTopic = document.getElementById("downloadTopic");
+const downloadTopicKeywords = document.getElementById("downloadTopicKeywords");
+const downloadOptimized = document.getElementById("downloadOptimized");
+const topicDownloadLinks = document.querySelectorAll(".topic-download");
+const topicResult = document.getElementById("topicResult");
+const topicScore = document.getElementById("topicScore");
+const topicRecommendation = document.getElementById("topicRecommendation");
+const topicReason = document.getElementById("topicReason");
+const topicKeywordBody = document.getElementById("topicKeywordBody");
+const topicKeywordCount = document.getElementById("topicKeywordCount");
+const optimizedBody = document.getElementById("optimizedBody");
+const optimizedCount = document.getElementById("optimizedCount");
 
 const numberFormat = new Intl.NumberFormat("zh-CN");
 let pollTimer = null;
+let currentMode = "topic";
+
+modeButtons.forEach((button) => {
+  button.addEventListener("click", () => setMode(button.dataset.mode));
+});
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -27,7 +48,6 @@ form.addEventListener("submit", async (event) => {
   setDownloads(null);
 
   const payload = {
-    keywords: document.getElementById("keywords").value,
     pages: Number(document.getElementById("pages").value),
     max_results: Number(document.getElementById("maxResults").value),
     sleep: Number(document.getElementById("sleep").value),
@@ -37,9 +57,18 @@ form.addEventListener("submit", async (event) => {
     enrich: document.getElementById("enrich").checked,
     force_ipv4: document.getElementById("forceIpv4").checked,
   };
+  let endpoint = "/api/runs";
+  if (currentMode === "topic") {
+    endpoint = "/api/topic-runs";
+    payload.topic = document.getElementById("topic").value;
+    payload.keyword_limit = Number(document.getElementById("keywordLimit").value);
+    payload.optimized_limit = Number(document.getElementById("optimizedLimit").value);
+  } else {
+    payload.keywords = document.getElementById("keywords").value;
+  }
 
   try {
-    const response = await fetch("/api/runs", {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -55,6 +84,18 @@ form.addEventListener("submit", async (event) => {
     setState("error", error.message);
   }
 });
+
+function setMode(mode) {
+  currentMode = mode === "keyword" ? "keyword" : "topic";
+  modeButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.mode === currentMode);
+  });
+  topicPanel.classList.toggle("hidden", currentMode !== "topic");
+  keywordPanel.classList.toggle("hidden", currentMode !== "keyword");
+  topicOnlyFields.forEach((field) => field.classList.toggle("hidden", currentMode !== "topic"));
+  topicDownloadLinks.forEach((link) => link.classList.toggle("hidden", currentMode !== "topic"));
+  runButton.querySelector("span:last-child").textContent = currentMode === "topic" ? "开始分析" : "开始排查";
+}
 
 function poll(jobId) {
   pollTimer = window.setInterval(async () => {
@@ -96,6 +137,11 @@ function renderJob(job) {
 
   const label = job.message || statusLabel(job.status);
   setState(job.status, label);
+  const isTopicJob = job.mode === "topic" || Boolean(job.topic_summary);
+  topicResult.classList.toggle("hidden", !isTopicJob);
+  renderTopicSummary(job.topic_summary);
+  renderTopicKeywords(job.topic_keywords || []);
+  renderOptimizedTopics(job.optimized_topics || []);
   renderSummary(job.summary || []);
   renderSuggestions(job.suggestions || []);
   renderDetails(job.details_preview || []);
@@ -106,7 +152,9 @@ function renderJob(job) {
 
 function setRunning(isRunning) {
   runButton.disabled = isRunning;
-  runButton.querySelector("span:last-child").textContent = isRunning ? "排查中" : "开始排查";
+  const idleText = currentMode === "topic" ? "开始分析" : "开始排查";
+  const busyText = currentMode === "topic" ? "分析中" : "排查中";
+  runButton.querySelector("span:last-child").textContent = isRunning ? busyText : idleText;
 }
 
 function setState(status, label) {
@@ -124,21 +172,89 @@ function statusLabel(status) {
 }
 
 function setDownloads(files) {
+  const links = [
+    [downloadSummary, "summary"],
+    [downloadSuggestions, "suggestions"],
+    [downloadDetail, "detail"],
+    [downloadTopic, "topic"],
+    [downloadTopicKeywords, "topic_keywords"],
+    [downloadOptimized, "optimized"],
+  ];
   if (!files) {
-    downloadSummary.classList.add("disabled");
-    downloadSuggestions.classList.add("disabled");
-    downloadDetail.classList.add("disabled");
-    downloadSummary.removeAttribute("href");
-    downloadSuggestions.removeAttribute("href");
-    downloadDetail.removeAttribute("href");
+    links.forEach(([link]) => disableDownload(link));
     return;
   }
-  downloadSummary.href = files.summary;
-  downloadSuggestions.href = files.suggestions;
-  downloadDetail.href = files.detail;
-  downloadSummary.classList.remove("disabled");
-  downloadSuggestions.classList.remove("disabled");
-  downloadDetail.classList.remove("disabled");
+  links.forEach(([link, key]) => {
+    if (files[key]) {
+      link.href = files[key];
+      link.classList.remove("disabled");
+    } else {
+      disableDownload(link);
+    }
+  });
+}
+
+function disableDownload(link) {
+  link.classList.add("disabled");
+  link.removeAttribute("href");
+}
+
+function renderTopicSummary(row) {
+  if (!row) {
+    topicScore.textContent = "-";
+    topicRecommendation.textContent = "-";
+    topicReason.textContent = "-";
+    return;
+  }
+  topicScore.textContent = row.topic_score ?? "-";
+  topicRecommendation.textContent = row.recommendation || "-";
+  topicRecommendation.className = `topic-tag ${tagClass(row.recommendation)}`;
+  topicReason.textContent = row.reason || "-";
+}
+
+function renderTopicKeywords(rows) {
+  topicKeywordCount.textContent = `${rows.length} 条`;
+  topicKeywordBody.replaceChildren();
+  if (!rows.length) {
+    topicKeywordBody.appendChild(emptyRow(7));
+    return;
+  }
+
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    tr.append(
+      cell(row.keyword),
+      scoreCell(row.importance_score),
+      scoreCell(row.opportunity_score),
+      cell(row.demand_score),
+      cell(row.competition_score),
+      cell(row.source),
+      tagCell(row.recommendation)
+    );
+    topicKeywordBody.appendChild(tr);
+  }
+}
+
+function renderOptimizedTopics(rows) {
+  optimizedCount.textContent = `${rows.length} 条`;
+  optimizedBody.replaceChildren();
+  if (!rows.length) {
+    optimizedBody.appendChild(emptyRow(6));
+    return;
+  }
+
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    tr.append(
+      cell(row.rank),
+      cell(row.optimized_topic),
+      scoreCell(row.score),
+      tagCell(row.recommendation),
+      cell(row.based_keyword),
+      cell(row.reason)
+    );
+    optimizedBody.appendChild(tr);
+  }
 }
 
 function renderSummary(rows) {
