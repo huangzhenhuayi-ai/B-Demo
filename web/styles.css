@@ -51,7 +51,7 @@ textarea {
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 22px;
+  margin-bottom: 16px;
 }
 
 .eyebrow {
@@ -134,11 +134,12 @@ h2 {
   top: 18px;
 }
 
-.mode-switch {
+.tool-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   padding: 4px;
+  margin-bottom: 18px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #eef2ee;
@@ -159,16 +160,22 @@ h2 {
   background: var(--accent);
 }
 
-.mode-panel {
-  display: grid;
-}
-
 .hidden {
   display: none !important;
 }
 
+.tool-view {
+  display: block;
+}
+
 .result-panel {
   padding: 18px;
+}
+
+.panel-state-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
 }
 
 .field {

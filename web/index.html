@@ -13,129 +13,115 @@
           <p class="eyebrow">Lucas Hotwords 2</p>
           <h1>B站选题热度排查</h1>
         </div>
-        <div class="run-state" id="runState">
-          <span class="state-dot idle"></span>
-          <span id="stateText">待运行</span>
-        </div>
       </header>
 
-      <section class="workspace">
-        <form class="control-panel" id="runForm">
-          <div class="mode-switch" role="tablist" aria-label="运行模式">
-            <button type="button" class="mode-button active" id="topicModeButton" data-mode="topic">选题分析</button>
-            <button type="button" class="mode-button" id="keywordModeButton" data-mode="keyword">关键词排查</button>
-          </div>
+      <nav class="tool-tabs" aria-label="工具切换">
+        <button type="button" class="mode-button active" data-tool="topic">选题分析</button>
+        <button type="button" class="mode-button" data-tool="keyword">关键词排查</button>
+      </nav>
 
-          <div class="mode-panel" id="topicPanel">
+      <section class="tool-view" id="topicTool">
+        <section class="workspace">
+          <form class="control-panel" id="topicForm">
             <label class="field field-keywords">
               <span>选题</span>
               <textarea id="topic" rows="5">普通人做AI副业还有机会吗？</textarea>
             </label>
-          </div>
 
-          <div class="mode-panel hidden" id="keywordPanel">
-            <label class="field field-keywords">
-              <span>关键词</span>
-              <textarea id="keywords" rows="7">AI副业
-普通人副业
-AI工具赚钱</textarea>
-            </label>
-          </div>
-
-          <div class="field-grid">
-            <label class="field">
-              <span>页数</span>
-              <input id="pages" type="number" min="1" max="5" value="1" />
-            </label>
-            <label class="field">
-              <span>最多条数</span>
-              <input id="maxResults" type="number" min="1" max="200" value="10" />
-            </label>
-            <label class="field">
-              <span>请求间隔</span>
-              <input id="sleep" type="number" min="0.1" max="10" step="0.1" value="1.2" />
-            </label>
-            <label class="field">
-              <span>超时秒数</span>
-              <input id="timeout" type="number" min="3" max="60" value="15" />
-            </label>
-            <label class="field">
-              <span>联想词数</span>
-              <input id="suggestionsLimit" type="number" min="0" max="20" value="10" />
-            </label>
-            <label class="field topic-only">
-              <span>拆解关键词</span>
-              <input id="keywordLimit" type="number" min="2" max="8" value="5" />
-            </label>
-            <label class="field topic-only">
-              <span>优化选题数</span>
-              <input id="optimizedLimit" type="number" min="3" max="12" value="8" />
-            </label>
-          </div>
-
-          <label class="field">
-            <span>排序</span>
-            <select id="order">
-              <option value="totalrank">综合排序</option>
-              <option value="click">最多播放</option>
-              <option value="pubdate">最新发布</option>
-              <option value="dm">最多弹幕</option>
-              <option value="stow">最多收藏</option>
-            </select>
-          </label>
-
-          <div class="toggle-row">
-            <label class="switch">
-              <input id="enrich" type="checkbox" checked />
-              <span class="slider"></span>
-              <span class="switch-label">补全点赞、投币、收藏</span>
-            </label>
-          </div>
-
-          <div class="toggle-row">
-            <label class="switch">
-              <input id="forceIpv4" type="checkbox" checked />
-              <span class="slider"></span>
-              <span class="switch-label">强制 IPv4 采集</span>
-            </label>
-          </div>
-
-          <button class="primary-button" type="submit" id="runButton">
-            <span class="button-icon">▶</span>
-            <span>开始分析</span>
-          </button>
-        </form>
-
-        <section class="result-panel">
-          <div class="metrics-row">
-            <div class="metric">
-              <span>关键词</span>
-              <strong id="keywordCount">0</strong>
+            <div class="field-grid">
+              <label class="field">
+                <span>页数</span>
+                <input id="topicPages" type="number" min="1" max="5" value="1" />
+              </label>
+              <label class="field">
+                <span>最多条数</span>
+                <input id="topicMaxResults" type="number" min="1" max="200" value="10" />
+              </label>
+              <label class="field">
+                <span>请求间隔</span>
+                <input id="topicSleep" type="number" min="0.1" max="10" step="0.1" value="1.2" />
+              </label>
+              <label class="field">
+                <span>超时秒数</span>
+                <input id="topicTimeout" type="number" min="3" max="60" value="15" />
+              </label>
+              <label class="field">
+                <span>拆解关键词</span>
+                <input id="keywordLimit" type="number" min="2" max="8" value="5" />
+              </label>
+              <label class="field">
+                <span>优化选题数</span>
+                <input id="optimizedLimit" type="number" min="3" max="12" value="8" />
+              </label>
             </div>
-            <div class="metric">
-              <span>已完成</span>
-              <strong id="doneCount">0</strong>
+
+            <label class="field">
+              <span>排序</span>
+              <select id="topicOrder">
+                <option value="totalrank">综合排序</option>
+                <option value="click">最多播放</option>
+                <option value="pubdate">最新发布</option>
+                <option value="dm">最多弹幕</option>
+                <option value="stow">最多收藏</option>
+              </select>
+            </label>
+
+            <div class="toggle-row">
+              <label class="switch">
+                <input id="topicEnrich" type="checkbox" checked />
+                <span class="slider"></span>
+                <span class="switch-label">补全点赞、投币、收藏</span>
+              </label>
             </div>
-            <div class="metric">
-              <span>当前</span>
-              <strong id="currentKeyword">-</strong>
+
+            <div class="toggle-row">
+              <label class="switch">
+                <input id="topicForceIpv4" type="checkbox" checked />
+                <span class="slider"></span>
+                <span class="switch-label">强制 IPv4 采集</span>
+              </label>
             </div>
-          </div>
 
-          <div class="progress-track">
-            <div class="progress-bar" id="progressBar"></div>
-          </div>
+            <button class="primary-button" type="submit" id="topicRunButton">
+              <span class="button-icon">▶</span>
+              <span>开始分析</span>
+            </button>
+          </form>
 
-          <div class="actions-row">
-            <a class="download disabled topic-download" id="downloadTopic" href="#">下载选题总分</a>
-            <a class="download disabled topic-download" id="downloadTopicKeywords" href="#">下载拆解词</a>
-            <a class="download disabled topic-download" id="downloadOptimized" href="#">下载优化选题</a>
-            <a class="download disabled" id="downloadSummary" href="#">下载汇总</a>
-            <a class="download disabled" id="downloadSuggestions" href="#">下载联想词</a>
-            <a class="download disabled" id="downloadDetail" href="#">下载明细</a>
-          </div>
+          <section class="result-panel">
+            <div class="panel-state-row">
+              <div class="run-state" id="topicRunState">
+                <span class="state-dot idle"></span>
+                <span id="topicStateText">待运行</span>
+              </div>
+            </div>
 
-          <div class="topic-result hidden" id="topicResult">
+            <div class="metrics-row">
+              <div class="metric">
+                <span>拆解关键词</span>
+                <strong id="topicTotalCount">0</strong>
+              </div>
+              <div class="metric">
+                <span>已完成</span>
+                <strong id="topicDoneCount">0</strong>
+              </div>
+              <div class="metric">
+                <span>当前</span>
+                <strong id="topicCurrentKeyword">-</strong>
+              </div>
+            </div>
+
+            <div class="progress-track">
+              <div class="progress-bar" id="topicProgressBar"></div>
+            </div>
+
+            <div class="actions-row">
+              <a class="download disabled" id="topicDownloadTopic" href="#">下载选题总分</a>
+              <a class="download disabled" id="topicDownloadKeywords" href="#">下载拆解词</a>
+              <a class="download disabled" id="topicDownloadOptimized" href="#">下载优化选题</a>
+              <a class="download disabled" id="topicDownloadDetail" href="#">下载明细</a>
+            </div>
+
             <div class="topic-score-grid">
               <div class="metric topic-score-card">
                 <span>选题总分</span>
@@ -178,7 +164,7 @@ AI工具赚钱</textarea>
             <div class="table-zone">
               <div class="table-head">
                 <h2>优化选题</h2>
-                <span id="optimizedCount">0 条</span>
+                <span id="topicOptimizedCount">0 条</span>
               </div>
               <div class="table-wrap optimized-table">
                 <table>
@@ -192,7 +178,7 @@ AI工具赚钱</textarea>
                       <th>原因</th>
                     </tr>
                   </thead>
-                  <tbody id="optimizedBody">
+                  <tbody id="topicOptimizedBody">
                     <tr>
                       <td colspan="6" class="empty">暂无结果</td>
                     </tr>
@@ -200,84 +186,213 @@ AI工具赚钱</textarea>
                 </table>
               </div>
             </div>
-          </div>
 
-          <div class="table-zone">
-            <div class="table-head">
-              <h2>关键词建议</h2>
-              <span id="summaryCount">0 条</span>
+            <div class="table-zone">
+              <div class="table-head">
+                <h2>视频明细预览</h2>
+                <span id="topicDetailCount">0 条</span>
+              </div>
+              <div class="table-wrap detail-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>排名</th>
+                      <th>标题</th>
+                      <th>UP主</th>
+                      <th>播放</th>
+                      <th>点赞</th>
+                      <th>收藏</th>
+                      <th>发布时间</th>
+                    </tr>
+                  </thead>
+                  <tbody id="topicDetailBody">
+                    <tr>
+                      <td colspan="7" class="empty">暂无结果</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>关键词</th>
-                    <th>机会分</th>
-                    <th>需求</th>
-                    <th>增长</th>
-                    <th>竞争</th>
-                    <th>建议</th>
-                    <th>原因</th>
-                  </tr>
-                </thead>
-                <tbody id="summaryBody">
-                  <tr>
-                    <td colspan="7" class="empty">暂无结果</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+          </section>
+        </section>
+      </section>
 
-          <div class="table-zone">
-            <div class="table-head">
-              <h2>搜索框联想词</h2>
-              <span id="suggestionCount">0 条</span>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>关键词</th>
-                    <th>排名</th>
-                    <th>联想词</th>
-                  </tr>
-                </thead>
-                <tbody id="suggestionBody">
-                  <tr>
-                    <td colspan="3" class="empty">暂无结果</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+      <section class="tool-view hidden" id="keywordTool">
+        <section class="workspace">
+          <form class="control-panel" id="keywordForm">
+            <label class="field field-keywords">
+              <span>关键词</span>
+              <textarea id="keywords" rows="7">AI副业
+普通人副业
+AI工具赚钱</textarea>
+            </label>
 
-          <div class="table-zone">
-            <div class="table-head">
-              <h2>视频明细预览</h2>
-              <span id="detailCount">0 条</span>
+            <div class="field-grid">
+              <label class="field">
+                <span>页数</span>
+                <input id="keywordPages" type="number" min="1" max="5" value="1" />
+              </label>
+              <label class="field">
+                <span>最多条数</span>
+                <input id="keywordMaxResults" type="number" min="1" max="200" value="10" />
+              </label>
+              <label class="field">
+                <span>请求间隔</span>
+                <input id="keywordSleep" type="number" min="0.1" max="10" step="0.1" value="1.2" />
+              </label>
+              <label class="field">
+                <span>超时秒数</span>
+                <input id="keywordTimeout" type="number" min="3" max="60" value="15" />
+              </label>
+              <label class="field">
+                <span>联想词数</span>
+                <input id="keywordSuggestionsLimit" type="number" min="0" max="20" value="10" />
+              </label>
             </div>
-            <div class="table-wrap detail-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>排名</th>
-                    <th>标题</th>
-                    <th>UP主</th>
-                    <th>播放</th>
-                    <th>点赞</th>
-                    <th>收藏</th>
-                    <th>发布时间</th>
-                  </tr>
-                </thead>
-                <tbody id="detailBody">
-                  <tr>
-                    <td colspan="7" class="empty">暂无结果</td>
-                  </tr>
-                </tbody>
-              </table>
+
+            <label class="field">
+              <span>排序</span>
+              <select id="keywordOrder">
+                <option value="totalrank">综合排序</option>
+                <option value="click">最多播放</option>
+                <option value="pubdate">最新发布</option>
+                <option value="dm">最多弹幕</option>
+                <option value="stow">最多收藏</option>
+              </select>
+            </label>
+
+            <div class="toggle-row">
+              <label class="switch">
+                <input id="keywordEnrich" type="checkbox" checked />
+                <span class="slider"></span>
+                <span class="switch-label">补全点赞、投币、收藏</span>
+              </label>
             </div>
-          </div>
+
+            <div class="toggle-row">
+              <label class="switch">
+                <input id="keywordForceIpv4" type="checkbox" checked />
+                <span class="slider"></span>
+                <span class="switch-label">强制 IPv4 采集</span>
+              </label>
+            </div>
+
+            <button class="primary-button" type="submit" id="keywordRunButton">
+              <span class="button-icon">▶</span>
+              <span>开始排查</span>
+            </button>
+          </form>
+
+          <section class="result-panel">
+            <div class="panel-state-row">
+              <div class="run-state" id="keywordRunState">
+                <span class="state-dot idle"></span>
+                <span id="keywordStateText">待运行</span>
+              </div>
+            </div>
+
+            <div class="metrics-row">
+              <div class="metric">
+                <span>关键词</span>
+                <strong id="keywordTotalCount">0</strong>
+              </div>
+              <div class="metric">
+                <span>已完成</span>
+                <strong id="keywordDoneCount">0</strong>
+              </div>
+              <div class="metric">
+                <span>当前</span>
+                <strong id="keywordCurrentKeyword">-</strong>
+              </div>
+            </div>
+
+            <div class="progress-track">
+              <div class="progress-bar" id="keywordProgressBar"></div>
+            </div>
+
+            <div class="actions-row">
+              <a class="download disabled" id="keywordDownloadSummary" href="#">下载汇总</a>
+              <a class="download disabled" id="keywordDownloadSuggestions" href="#">下载联想词</a>
+              <a class="download disabled" id="keywordDownloadDetail" href="#">下载明细</a>
+            </div>
+
+            <div class="table-zone">
+              <div class="table-head">
+                <h2>关键词建议</h2>
+                <span id="keywordSummaryCount">0 条</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>关键词</th>
+                      <th>机会分</th>
+                      <th>需求</th>
+                      <th>增长</th>
+                      <th>竞争</th>
+                      <th>建议</th>
+                      <th>原因</th>
+                    </tr>
+                  </thead>
+                  <tbody id="keywordSummaryBody">
+                    <tr>
+                      <td colspan="7" class="empty">暂无结果</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="table-zone">
+              <div class="table-head">
+                <h2>搜索框联想词</h2>
+                <span id="keywordSuggestionCount">0 条</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>关键词</th>
+                      <th>排名</th>
+                      <th>联想词</th>
+                    </tr>
+                  </thead>
+                  <tbody id="keywordSuggestionBody">
+                    <tr>
+                      <td colspan="3" class="empty">暂无结果</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="table-zone">
+              <div class="table-head">
+                <h2>视频明细预览</h2>
+                <span id="keywordDetailCount">0 条</span>
+              </div>
+              <div class="table-wrap detail-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>排名</th>
+                      <th>标题</th>
+                      <th>UP主</th>
+                      <th>播放</th>
+                      <th>点赞</th>
+                      <th>收藏</th>
+                      <th>发布时间</th>
+                    </tr>
+                  </thead>
+                  <tbody id="keywordDetailBody">
+                    <tr>
+                      <td colspan="7" class="empty">暂无结果</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
         </section>
       </section>
     </main>
