@@ -124,6 +124,69 @@ ACTION_WORDS = [
 ]
 
 
+FILM_DOMAIN_WORDS = [
+    "影视",
+    "电影",
+    "电视剧",
+    "剧集",
+    "国产剧",
+    "韩剧",
+    "日剧",
+    "美剧",
+    "泰剧",
+    "港剧",
+    "英剧",
+    "网剧",
+    "综艺",
+    "动漫",
+    "动画",
+    "番剧",
+    "纪录片",
+    "演员",
+    "导演",
+    "主演",
+    "角色",
+    "人物",
+    "剧情",
+    "结局",
+    "伏笔",
+    "反转",
+    "名场面",
+    "解说",
+    "影评",
+    "剧评",
+    "烂尾",
+    "开播",
+    "上映",
+    "更新",
+    "一口气看完",
+]
+
+
+FILM_INTENT_WORDS = [
+    "解说",
+    "解析",
+    "剧情",
+    "结局",
+    "伏笔",
+    "细节",
+    "反转",
+    "人物",
+    "角色",
+    "关系",
+    "名场面",
+    "看懂",
+    "剧评",
+    "影评",
+    "值得看",
+    "烂尾",
+    "封神",
+    "高能",
+    "一口气",
+    "全梳理",
+]
+
+
 NOISE_WORDS = [
     "一个",
     "一种",
@@ -277,6 +340,7 @@ def analyze_topic(
         merged_keywords,
         all_suggestions,
         topic_summary,
+        all_rows,
         limit=optimized_limit,
     )
 
@@ -651,6 +715,7 @@ def generate_optimized_topics(
     keyword_rows: Sequence[Dict[str, Any]],
     suggestions: Sequence[Dict[str, Any]],
     topic_summary: Dict[str, Any],
+    source_rows: Sequence[Dict[str, Any]],
     limit: int,
 ) -> List[Dict[str, Any]]:
     keywords = [row["keyword"] for row in keyword_rows if row.get("keyword")]
@@ -662,18 +727,11 @@ def generate_optimized_topics(
         if row.get("suggestion") and 3 <= len(row["suggestion"]) <= 18 and row["suggestion"] != topic
     ]
 
-    candidates = [
-        f"{primary}到底还值不值得做？",
-        f"普通人做{primary}，先看这几个坑",
-        f"{primary}新手入门：从0到1怎么做",
-        f"我测试了{primary}，真实结果怎么样",
-        f"一口气讲清楚{primary}的机会和风险",
-    ]
-    if secondary:
-        candidates.append(f"{primary}和{secondary}怎么选？")
-    for term in suggestion_terms[:6]:
-        candidates.append(f"{term}避坑指南")
-        candidates.append(f"{term}真实数据复盘")
+    domain = infer_topic_domain(topic, keyword_rows, suggestions, source_rows)
+    if domain == "film":
+        candidates = film_topic_candidates(topic, primary, secondary, suggestion_terms)
+    else:
+        candidates = general_topic_candidates(primary, secondary, suggestion_terms)
 
     rows: List[Dict[str, Any]] = []
     seen = set()
@@ -682,7 +740,7 @@ def generate_optimized_topics(
         if not title or title in seen or title == topic:
             continue
         seen.add(title)
-        score, based_keyword, reason = score_optimized_topic(title, keyword_rows, topic_summary)
+        score, based_keyword, reason = score_optimized_topic(title, keyword_rows, topic_summary, domain)
         rows.append(
             {
                 "platform": "bilibili",
@@ -702,6 +760,107 @@ def generate_optimized_topics(
     return rows[:limit]
 
 
+def infer_topic_domain(
+    topic: str,
+    keyword_rows: Sequence[Dict[str, Any]],
+    suggestions: Sequence[Dict[str, Any]],
+    source_rows: Sequence[Dict[str, Any]],
+) -> str:
+    parts: List[str] = [topic]
+    parts.extend(str(row.get("keyword", "")) for row in keyword_rows)
+    parts.extend(str(row.get("suggestion", "")) for row in suggestions)
+    for row in source_rows[:20]:
+        parts.extend(
+            [
+                str(row.get("title", "")),
+                str(row.get("category", "")),
+                str(row.get("tags", "")),
+                str(row.get("description", "")),
+            ]
+        )
+
+    text = " ".join(parts)
+    film_hits = sum(1 for word in FILM_DOMAIN_WORDS if word and word in text)
+    if film_hits >= 1:
+        return "film"
+    return "general"
+
+
+def film_topic_candidates(
+    topic: str,
+    primary: str,
+    secondary: str,
+    suggestion_terms: Sequence[str],
+) -> List[str]:
+    title = strip_film_question_words(primary) if primary and primary != topic else ""
+    if not title:
+        title = strip_film_question_words(topic)
+    if not title:
+        title = primary or topic
+    secondary_title = strip_film_question_words(secondary)
+
+    candidates = [
+        f"{title}一口气看懂：剧情和人物关系全梳理",
+        f"{title}结局解析：这几个伏笔很多人没看懂",
+        f"{title}为什么能火？爽点和反转拆解",
+        f"{title}值不值得看？无剧透剧评",
+        f"{title}高能名场面盘点：最狠的反转在哪",
+        f"{title}人物关系解析：谁才是真正的关键角色",
+        f"{title}细节伏笔复盘：二刷才看懂的地方",
+        f"{title}被低估了吗？优点和争议一次说清",
+    ]
+    if secondary_title and secondary_title != title:
+        candidates.append(f"{title}和{secondary_title}对比：谁的剧情更有看点")
+    for term in suggestion_terms[:5]:
+        compact = strip_film_question_words(term)
+        if compact and compact != title:
+            candidates.append(f"{compact}剧情解析")
+            candidates.append(f"{compact}结局和伏笔全梳理")
+    return candidates
+
+
+def general_topic_candidates(
+    primary: str,
+    secondary: str,
+    suggestion_terms: Sequence[str],
+) -> List[str]:
+    candidates = [
+        f"{primary}到底还值不值得做？",
+        f"普通人做{primary}，先看这几个坑",
+        f"{primary}新手入门：从0到1怎么做",
+        f"我测试了{primary}，真实结果怎么样",
+        f"一口气讲清楚{primary}的机会和风险",
+    ]
+    if secondary:
+        candidates.append(f"{primary}和{secondary}怎么选？")
+    for term in suggestion_terms[:6]:
+        candidates.append(f"{term}避坑指南")
+        candidates.append(f"{term}真实数据复盘")
+    return candidates
+
+
+def strip_film_question_words(value: str) -> str:
+    text = normalize_candidate(value)
+    for word in [
+        "为什么",
+        "怎么",
+        "如何",
+        "到底",
+        "真的",
+        "值不值得看",
+        "值不值得",
+        "好看吗",
+        "好不好看",
+        "结局解析",
+        "剧情解析",
+        "解说",
+        "影评",
+        "剧评",
+    ]:
+        text = text.replace(word, "")
+    return normalize_candidate(text)
+
+
 def best_core_keyword(topic: str, keywords: Sequence[str]) -> str:
     for keyword in keywords:
         if keyword != topic and 2 <= len(keyword) <= 14:
@@ -715,6 +874,7 @@ def score_optimized_topic(
     title: str,
     keyword_rows: Sequence[Dict[str, Any]],
     topic_summary: Dict[str, Any],
+    domain: str = "general",
 ) -> Tuple[float, str, str]:
     matched_rows = [row for row in keyword_rows if row.get("keyword") and row["keyword"] in title]
     if matched_rows:
@@ -728,18 +888,33 @@ def score_optimized_topic(
     differentiation = score_differentiation(title, keyword_rows)
     intent = score_search_intent(title, [])
     length_bonus = 5 if 10 <= len(title) <= 28 else -5
-    score = clamp(base * 0.55 + clarity * 0.25 + differentiation * 0.12 + intent * 0.08 + length_bonus)
+    domain_bonus = score_domain_fit(title, domain)
+    score = clamp(base * 0.50 + clarity * 0.22 + differentiation * 0.10 + intent * 0.06 + domain_bonus * 0.12 + length_bonus)
 
     reasons = []
-    if any(word in title for word in AUDIENCE_WORDS):
-        reasons.append("增加人群限定")
-    if any(word in title for word in ["避坑", "真实", "复盘", "风险"]):
-        reasons.append("强化差异化角度")
-    if any(word in title for word in ["怎么", "入门", "讲清楚", "值不值得"]):
-        reasons.append("搜索意图更明确")
+    if domain == "film":
+        reasons.append("匹配影视内容结构")
+        if any(word in title for word in ["剧情", "结局", "伏笔", "人物", "反转", "名场面"]):
+            reasons.append("强化解说/解析角度")
+        if any(word in title for word in ["值得看", "剧评", "影评", "争议"]):
+            reasons.append("适合影视区评测表达")
+    else:
+        if any(word in title for word in AUDIENCE_WORDS):
+            reasons.append("增加人群限定")
+        if any(word in title for word in ["避坑", "真实", "复盘", "风险"]):
+            reasons.append("强化差异化角度")
+        if any(word in title for word in ["怎么", "入门", "讲清楚", "值不值得"]):
+            reasons.append("搜索意图更明确")
     if not reasons:
         reasons.append("基于高相关关键词优化表达")
     return score, based_keyword, "；".join(reasons)
+
+
+def score_domain_fit(title: str, domain: str) -> float:
+    if domain == "film":
+        hits = sum(1 for word in FILM_INTENT_WORDS if word in title)
+        return clamp(42 + hits * 12)
+    return 60
 
 
 def empty_topic_keyword_summary(keyword: str, error: str) -> Dict[str, Any]:
