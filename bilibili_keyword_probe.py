@@ -105,6 +105,7 @@ class FetchConfig:
     jitter_seconds: float = 0.4
     force_ipv4: bool = True
     prefer_curl: bool = True
+    cookie_file: Optional[str] = None
 
 
 _ORIGINAL_GETADDRINFO = socket.getaddrinfo
@@ -138,6 +139,52 @@ def find_curl() -> Optional[str]:
     return None
 
 
+def default_cookie_file() -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "outputs", "runtime", "bilibili_cookies.txt")
+
+
+def ensure_bilibili_cookie_file(headers: Dict[str, str], config: FetchConfig) -> str:
+    curl = find_curl()
+    if not curl:
+        raise RuntimeError("curl is not available")
+
+    cookie_file = config.cookie_file or default_cookie_file()
+    os.makedirs(os.path.dirname(cookie_file), exist_ok=True)
+    if os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 0:
+        return cookie_file
+
+    command = [
+        curl,
+        "--silent",
+        "--show-error",
+        "--location",
+        "--max-time",
+        str(max(3, int(config.timeout))),
+        "--cookie-jar",
+        cookie_file,
+    ]
+    if config.force_ipv4:
+        command.append("--ipv4")
+    for key, value in headers.items():
+        command.extend(["--header", f"{key}: {value}"])
+    command.append("https://www.bilibili.com")
+
+    completed = subprocess.run(command, capture_output=True, timeout=config.timeout + 8, check=False)
+    if completed.returncode != 0:
+        stderr = completed.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"curl cookie warmup failed with exit code {completed.returncode}: {stderr}")
+    return cookie_file
+
+
+def reset_bilibili_cookie(config: FetchConfig) -> None:
+    cookie_file = config.cookie_file or default_cookie_file()
+    try:
+        if os.path.exists(cookie_file):
+            os.remove(cookie_file)
+    except OSError:
+        pass
+
+
 def request_json_with_curl(full_url: str, headers: Dict[str, str], config: FetchConfig) -> Dict[str, Any]:
     curl = find_curl()
     if not curl:
@@ -151,6 +198,8 @@ def request_json_with_curl(full_url: str, headers: Dict[str, str], config: Fetch
         "--max-time",
         str(max(3, int(config.timeout))),
     ]
+    cookie_file = ensure_bilibili_cookie_file(headers, config)
+    command.extend(["--cookie", cookie_file, "--cookie-jar", cookie_file])
     if config.force_ipv4:
         command.append("--ipv4")
     for key, value in headers.items():
@@ -313,6 +362,8 @@ def request_json(
                 return request_json_with_curl(full_url, headers, config)
             except (subprocess.TimeoutExpired, RuntimeError) as exc:
                 last_error = exc
+                if "-412" in str(exc) or "request was banned" in str(exc):
+                    reset_bilibili_cookie(config)
                 if attempt < config.retries:
                     time.sleep(min(8, attempt * 1.5))
                     continue
